@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TARGET_SCHEMA } from '@/types/sync';
 import type { ColumnMapping } from '@/types/sync';
@@ -9,6 +10,7 @@ import type { ColumnMapping } from '@/types/sync';
 interface Props {
   sourceHeaders: string[];
   mappings: ColumnMapping[];
+  isComparing?: boolean;
   onMappingsSet: (mappings: ColumnMapping[]) => void;
   onBack: () => void;
 }
@@ -37,7 +39,7 @@ function computeAutoMapStats(sourceHeaders: string[]) {
   return { matched, unmatched, unmappedSource, total: TARGET_SCHEMA.length };
 }
 
-export default function StepColumnMapping({ sourceHeaders, mappings: existingMappings, onMappingsSet, onBack }: Props) {
+export default function StepColumnMapping({ sourceHeaders, mappings: existingMappings, isComparing, onMappingsSet, onBack }: Props) {
   const [mappings, setMappings] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     for (const targetCol of TARGET_SCHEMA) {
@@ -155,11 +157,25 @@ export default function StepColumnMapping({ sourceHeaders, mappings: existingMap
           <p className="text-sm text-destructive">At least Email or Phoneno must be mapped.</p>
         )}
 
-        <div className="flex justify-end pt-2">
-          <Button onClick={handleContinue} disabled={!hasMatchKey} className="gap-2">
-            Run Comparison <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
+        {isComparing ? (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-3 justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-sm font-medium text-foreground">Running comparison…</p>
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-5/6" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleContinue} disabled={!hasMatchKey} className="gap-2">
+              Run Comparison <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

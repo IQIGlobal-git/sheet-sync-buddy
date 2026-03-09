@@ -3,6 +3,7 @@ import {
   runComparison,
   normalizeEmail,
   normalizePhone,
+  normalizeDate,
   isBlank,
 } from './comparisonEngine';
 import type { ColumnMapping, SheetRow } from '@/types/sync';
@@ -38,6 +39,39 @@ describe('normalizePhone', () => {
   it('returns empty for null/undefined', () => {
     expect(normalizePhone(null)).toBe('');
     expect(normalizePhone(undefined)).toBe('');
+  });
+});
+
+describe('normalizeDate', () => {
+  it('formats ISO 8601 date to DD/MM/YYYY HH:mm:ss', () => {
+    const result = normalizeDate('2026-03-02T08:06:09+08:00');
+    // The exact output depends on the runtime timezone, but it must match DD/MM/YYYY HH:mm:ss
+    expect(result).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/);
+  });
+  it('formats UTC suffix date to DD/MM/YYYY HH:mm:ss', () => {
+    const result = normalizeDate('2026-02-06 02:22:57(UTC+08:00)');
+    expect(result).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/);
+  });
+  it('returns empty for null/undefined/blank', () => {
+    expect(normalizeDate(null)).toBe('');
+    expect(normalizeDate(undefined)).toBe('');
+    expect(normalizeDate('')).toBe('');
+    expect(normalizeDate('   ')).toBe('');
+  });
+  it('returns raw value for unparseable date', () => {
+    expect(normalizeDate('not a date')).toBe('not a date');
+  });
+  it('preserves DD/MM/YYYY HH:mm:ss format as-is', () => {
+    expect(normalizeDate('07/03/2026 18:03:53')).toBe('07/03/2026 18:03:53');
+  });
+  it('zero-pads D/M/YYYY to DD/MM/YYYY and adds time', () => {
+    expect(normalizeDate('7/3/2026')).toBe('07/03/2026 00:00:00');
+  });
+  it('zero-pads D/M/YYYY H:m:s to DD/MM/YYYY HH:mm:ss', () => {
+    expect(normalizeDate('7/3/2026 8:5:3')).toBe('07/03/2026 08:05:03');
+  });
+  it('preserves DD/MM/YYYY without time and adds 00:00:00', () => {
+    expect(normalizeDate('15/12/2025')).toBe('15/12/2025 00:00:00');
   });
 });
 

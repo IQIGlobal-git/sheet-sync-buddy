@@ -15,6 +15,7 @@ export interface SyncHistoryEntry {
   primaryTabName: string;
   sourceType: string;
   sourceLabel: string;
+  sourceLabels?: string[];
   destinationTabName: string;
   newLeadsAdded: number;
   rowsUpdated: number;

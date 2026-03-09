@@ -6,11 +6,13 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TARGET_SCHEMA } from '@/types/sync';
 import type { ColumnMapping } from '@/types/sync';
+import type { ComparisonProgress } from '@/features/sync/comparisonEngine';
 
 interface Props {
   sourceHeaders: string[];
   mappings: ColumnMapping[];
   isComparing?: boolean;
+  comparisonProgress?: ComparisonProgress | null;
   onMappingsSet: (mappings: ColumnMapping[]) => void;
   onBack: () => void;
 }

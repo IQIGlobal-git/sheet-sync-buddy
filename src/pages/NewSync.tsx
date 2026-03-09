@@ -59,18 +59,25 @@ export default function NewSync() {
 
   // Run comparison
   const [isComparing, setIsComparing] = useState(false);
+  const [comparisonProgress, setComparisonProgress] = useState<ComparisonProgress | null>(null);
 
-  const handleRunComparison = (mappingsOverride?: ColumnMapping[]) => {
+  const handleRunComparison = async (mappingsOverride?: ColumnMapping[]) => {
     const effectiveMappings = mappingsOverride || columnMappings;
     if (!sourceRows.length || !effectiveMappings.length) return;
     setIsComparing(true);
-    // Use setTimeout to let the loading UI render before blocking computation
-    setTimeout(() => {
-      const result = runComparison(primaryRows, sourceRows, effectiveMappings);
-      setComparisonResult(result);
-      setIsComparing(false);
-      next();
-    }, 50);
+    setComparisonProgress({ processed: 0, total: sourceRows.length });
+
+    const result = await runComparisonAsync(
+      primaryRows,
+      sourceRows,
+      effectiveMappings,
+      setComparisonProgress
+    );
+
+    setComparisonResult(result);
+    setIsComparing(false);
+    setComparisonProgress(null);
+    next();
   };
 
   // Execute sync

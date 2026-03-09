@@ -39,7 +39,7 @@ function computeAutoMapStats(sourceHeaders: string[]) {
   return { matched, unmatched, unmappedSource, total: TARGET_SCHEMA.length };
 }
 
-export default function StepColumnMapping({ sourceHeaders, mappings: existingMappings, onMappingsSet, onBack }: Props) {
+export default function StepColumnMapping({ sourceHeaders, mappings: existingMappings, isComparing, onMappingsSet, onBack }: Props) {
   const [mappings, setMappings] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     for (const targetCol of TARGET_SCHEMA) {

@@ -61,6 +61,18 @@ describe('normalizeDate', () => {
   it('returns raw value for unparseable date', () => {
     expect(normalizeDate('not a date')).toBe('not a date');
   });
+  it('preserves DD/MM/YYYY HH:mm:ss format as-is', () => {
+    expect(normalizeDate('07/03/2026 18:03:53')).toBe('07/03/2026 18:03:53');
+  });
+  it('zero-pads D/M/YYYY to DD/MM/YYYY and adds time', () => {
+    expect(normalizeDate('7/3/2026')).toBe('07/03/2026 00:00:00');
+  });
+  it('zero-pads D/M/YYYY H:m:s to DD/MM/YYYY HH:mm:ss', () => {
+    expect(normalizeDate('7/3/2026 8:5:3')).toBe('07/03/2026 08:05:03');
+  });
+  it('preserves DD/MM/YYYY without time and adds 00:00:00', () => {
+    expect(normalizeDate('15/12/2025')).toBe('15/12/2025 00:00:00');
+  });
 });
 
 describe('isBlank', () => {

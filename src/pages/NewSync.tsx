@@ -5,19 +5,17 @@ import AppLayout from '@/components/layout/AppLayout';
 import WizardStepper from '@/components/sync-wizard/WizardStepper';
 import StepSheetSelect from '@/components/sync-wizard/StepSheetSelect';
 import StepTabSelect from '@/components/sync-wizard/StepTabSelect';
-import StepSourceSelect from '@/components/sync-wizard/StepSourceSelect';
-import StepSourceData from '@/components/sync-wizard/StepSourceData';
-import StepColumnMapping from '@/components/sync-wizard/StepColumnMapping';
+import StepSources from '@/components/sync-wizard/StepSources';
 import StepPreview from '@/components/sync-wizard/StepPreview';
 import StepDestination from '@/components/sync-wizard/StepDestination';
 import StepConfirm from '@/components/sync-wizard/StepConfirm';
 import { useGoogleAuth } from '@/features/auth/GoogleAuthContext';
-import { runComparisonAsync, type ComparisonProgress } from '@/features/sync/comparisonEngine';
+import { runComparisonAsync, mapSourceRow, normalizeEmail, normalizePhone, type ComparisonProgress } from '@/features/sync/comparisonEngine';
 import { readRows, appendRows, updateCells, createTab, listTabs } from '@/services/googleSheets';
 import { addSyncHistoryEntry } from '@/services/syncHistory';
 import { TARGET_SCHEMA } from '@/types/sync';
 import { rowToArray } from '@/lib/schema';
-import type { SyncWizardState, ColumnMapping, SourceType, ComparisonResult, DestinationConfig } from '@/types/sync';
+import type { SourceEntry, ColumnMapping, ComparisonResult, DestinationConfig } from '@/types/sync';
 import type { GoogleSpreadsheet, GoogleSheetTab, CellUpdate } from '@/types/google';
 
 export default function NewSync() {
@@ -30,11 +28,7 @@ export default function NewSync() {
   const [primarySheet, setPrimarySheet] = useState<GoogleSpreadsheet | null>(null);
   const [primaryTabs, setPrimaryTabs] = useState<GoogleSheetTab[]>([]);
   const [primaryTab, setPrimaryTab] = useState<string>('');
-  const [sourceType, setSourceType] = useState<SourceType>('csv');
-  const [sourceHeaders, setSourceHeaders] = useState<string[]>([]);
-  const [sourceRows, setSourceRows] = useState<Record<string, string>[]>([]);
-  const [sourceLabel, setSourceLabel] = useState('');
-  const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
+  const [sources, setSources] = useState<SourceEntry[]>([]);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [destination, setDestination] = useState<DestinationConfig>({ type: 'same_tab', tabName: '' });
   const [primaryRows, setPrimaryRows] = useState<Record<string, string>[]>([]);
@@ -61,16 +55,44 @@ export default function NewSync() {
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonProgress, setComparisonProgress] = useState<ComparisonProgress | null>(null);
 
-  const handleRunComparison = async (mappingsOverride?: ColumnMapping[]) => {
-    const effectiveMappings = mappingsOverride || columnMappings;
-    if (!sourceRows.length || !effectiveMappings.length) return;
+  const handleRunComparison = async () => {
+    if (sources.length === 0) return;
+
+    // Merge all sources: map each source's rows using its own column mappings
+    const allMappedRows: Record<string, string>[] = [];
+    for (const source of sources) {
+      for (const row of source.rows) {
+        const mapped = mapSourceRow(row, source.columnMappings);
+        allMappedRows.push(mapped);
+      }
+    }
+
+    // Deduplicate merged rows by email (primary) then phone (fallback)
+    const seen = new Set<string>();
+    const deduped: Record<string, string>[] = [];
+    for (const row of allMappedRows) {
+      const email = normalizeEmail(row['Email']);
+      const phone = normalizePhone(row['Phoneno']);
+      const key = email || phone || '';
+      if (!key || !seen.has(key)) {
+        if (key) seen.add(key);
+        deduped.push(row);
+      }
+    }
+
+    // Use identity mappings since rows are already mapped to target schema
+    const identityMappings: ColumnMapping[] = TARGET_SCHEMA.map((col) => ({
+      sourceColumn: col,
+      targetColumn: col,
+    }));
+
     setIsComparing(true);
-    setComparisonProgress({ processed: 0, total: sourceRows.length });
+    setComparisonProgress({ processed: 0, total: deduped.length });
 
     const result = await runComparisonAsync(
       primaryRows,
-      sourceRows,
-      effectiveMappings,
+      deduped,
+      identityMappings,
       setComparisonProgress
     );
 
@@ -143,12 +165,15 @@ export default function NewSync() {
       }
 
       // Log to history
+      const sourceLabels = sources.map((s) => s.label);
+      const compositeSourceLabel = sourceLabels.join(', ');
       addSyncHistoryEntry({
         id: crypto.randomUUID(),
         primarySheetName: primarySheet.name,
         primaryTabName: primaryTab,
-        sourceType,
-        sourceLabel,
+        sourceType: sources.length === 1 ? sources[0].type : 'csv',
+        sourceLabel: compositeSourceLabel,
+        sourceLabels,
         destinationTabName: destTab,
         newLeadsAdded: comparisonResult.summary.newLeadCount,
         rowsUpdated: comparisonResult.summary.updateCount,
@@ -175,6 +200,8 @@ export default function NewSync() {
     }
   };
 
+  const compositeSourceLabel = sources.map((s) => s.label).join(', ');
+
   const steps = [
     <StepSheetSelect key={0} onSelect={(sheet) => { setPrimarySheet(sheet); next(); }} />,
     <StepTabSelect
@@ -185,39 +212,23 @@ export default function NewSync() {
       onSelect={(tab) => { setPrimaryTab(tab); next(); }}
       onBack={back}
     />,
-    <StepSourceSelect
+    <StepSources
       key={2}
-      onSelect={(type) => { setSourceType(type); next(); }}
-      onBack={back}
-    />,
-    <StepSourceData
-      key={3}
-      sourceType={sourceType}
-      onData={(headers, rows, label) => {
-        setSourceHeaders(headers);
-        setSourceRows(rows);
-        setSourceLabel(label);
-        next();
-      }}
-      onBack={back}
-    />,
-    <StepColumnMapping
-      key={4}
-      sourceHeaders={sourceHeaders}
+      sources={sources}
+      onSourcesChange={setSources}
       isComparing={isComparing}
       comparisonProgress={comparisonProgress}
-      onMappingsSet={(m) => { setColumnMappings(m); handleRunComparison(m); }}
+      onRunComparison={handleRunComparison}
       onBack={back}
-      mappings={columnMappings}
     />,
     <StepPreview
-      key={5}
+      key={3}
       result={comparisonResult}
       onNext={next}
       onBack={back}
     />,
     <StepDestination
-      key={6}
+      key={4}
       primaryTab={primaryTab}
       spreadsheetId={primarySheet?.id || ''}
       tabs={primaryTabs}
@@ -226,10 +237,10 @@ export default function NewSync() {
       onBack={back}
     />,
     <StepConfirm
-      key={7}
+      key={5}
       primarySheet={primarySheet}
       primaryTab={primaryTab}
-      sourceLabel={sourceLabel}
+      sourceLabel={compositeSourceLabel}
       destination={destination}
       result={comparisonResult}
       primaryHeaders={primaryHeaders}

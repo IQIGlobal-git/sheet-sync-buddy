@@ -22,9 +22,7 @@ export const CSV_MIME_TYPES = [
 export const WIZARD_STEPS = [
   'Primary Sheet',
   'Primary Tab',
-  'Source',
-  'Source Data',
-  'Column Mapping',
+  'Sources',
   'Preview',
   'Destination',
   'Confirm',

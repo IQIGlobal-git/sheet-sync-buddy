@@ -79,6 +79,16 @@ export interface DestinationConfig {
   tabName: string;
 }
 
+/** A single source entry for multi-source sync */
+export interface SourceEntry {
+  id: string;
+  type: SourceType;
+  label: string;
+  headers: string[];
+  rows: SheetRow[];
+  columnMappings: ColumnMapping[];
+}
+
 /** Sync wizard state */
 export interface SyncWizardState {
   primarySheetId: string;

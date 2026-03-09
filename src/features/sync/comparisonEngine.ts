@@ -36,6 +36,21 @@ export function normalizeDate(value: string | undefined | null): string {
   if (!value || !value.trim()) return '';
   const raw = value.trim();
 
+  // Already in DD/MM/YYYY format — return as-is (zero-padded)
+  const ddmmMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?$/);
+  if (ddmmMatch) {
+    const dd = ddmmMatch[1].padStart(2, '0');
+    const mm = ddmmMatch[2].padStart(2, '0');
+    const yyyy = ddmmMatch[3];
+    if (ddmmMatch[4]) {
+      const hh = ddmmMatch[4].padStart(2, '0');
+      const min = ddmmMatch[5].padStart(2, '0');
+      const ss = ddmmMatch[6].padStart(2, '0');
+      return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+    }
+    return `${dd}/${mm}/${yyyy} 00:00:00`;
+  }
+
   let date: Date | null = null;
 
   // Format: "2026-02-06 02:22:57(UTC+08:00)" — strip the "(UTC+HH:MM)" suffix
@@ -83,7 +98,7 @@ function extractKey(row: SheetRow): RowKey {
 
 // ─── Map Source Row to Target Schema ─────────────────────────
 
-function mapSourceRow(
+export function mapSourceRow(
   sourceRow: SheetRow,
   mappings: ColumnMapping[]
 ): SheetRow {

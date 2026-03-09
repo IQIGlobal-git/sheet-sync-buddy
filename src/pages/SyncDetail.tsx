@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import AppLayout from '@/components/layout/AppLayout';
 import { getSyncHistoryEntry } from '@/services/syncHistory';
+import { TARGET_SCHEMA } from '@/types/sync';
 
 export default function SyncDetail() {
   const { id } = useParams<{ id: string }>();
@@ -56,8 +57,12 @@ export default function SyncDetail() {
                 <span className="font-medium text-foreground">{entry.primaryTabName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Source</span>
-                <span className="font-medium text-foreground">{entry.sourceLabel}</span>
+                <span className="text-muted-foreground">Source(s)</span>
+                <span className="font-medium text-foreground text-right">
+                  {entry.sourceLabels
+                    ? entry.sourceLabels.map((l, i) => <div key={i}>{l}</div>)
+                    : entry.sourceLabel}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Destination</span>
@@ -116,30 +121,32 @@ export default function SyncDetail() {
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <ScrollArea className="max-h-80">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-10">#</TableHead>
-                              <TableHead>FullName</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Phoneno</TableHead>
-                              <TableHead>Location</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {entry.logs.newLeads.map((lead, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                                <TableCell>{lead.mappedRow['FullName'] || '—'}</TableCell>
-                                <TableCell>{lead.mappedRow['Email'] || '—'}</TableCell>
-                                <TableCell>{lead.mappedRow['Phoneno'] || '—'}</TableCell>
-                                <TableCell>{lead.mappedRow['Location'] || '—'}</TableCell>
+                      <div className="overflow-x-auto">
+                        <ScrollArea className="max-h-96">
+                          <Table className="min-w-[1200px]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-10 sticky left-0 bg-background">#</TableHead>
+                                {TARGET_SCHEMA.map((col) => (
+                                  <TableHead key={col}>{col}</TableHead>
+                                ))}
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
+                            </TableHeader>
+                            <TableBody>
+                              {entry.logs.newLeads.map((lead, i) => (
+                                <TableRow key={i}>
+                                  <TableCell className="text-muted-foreground sticky left-0 bg-background">{i + 1}</TableCell>
+                                  {TARGET_SCHEMA.map((col) => (
+                                    <TableCell key={col} className="text-xs whitespace-nowrap">
+                                      {lead.mappedRow[col] || '—'}
+                                    </TableCell>
+                                  ))}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      </div>
                     </AccordionContent>
                   </AccordionItem>
                 )}
@@ -153,36 +160,41 @@ export default function SyncDetail() {
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <ScrollArea className="max-h-80">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-10">#</TableHead>
-                              <TableHead>Matched By</TableHead>
-                              <TableHead>Match Value</TableHead>
-                              <TableHead>Fields Filled</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {entry.logs.updates.map((update, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{update.matchedBy}</Badge>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">{update.matchValue}</TableCell>
-                                <TableCell>
-                                  {Object.entries(update.fieldsToFill).map(([col, val]) => (
-                                    <span key={col} className="inline-block mr-2 text-xs">
-                                      <span className="text-muted-foreground">{col}:</span> {val}
-                                    </span>
-                                  ))}
-                                </TableCell>
+                      <div className="overflow-x-auto">
+                        <ScrollArea className="max-h-96">
+                          <Table className="min-w-[1400px]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-10 sticky left-0 bg-background">#</TableHead>
+                                <TableHead>Matched By</TableHead>
+                                <TableHead>Match Value</TableHead>
+                                {TARGET_SCHEMA.map((col) => (
+                                  <TableHead key={col}>{col}</TableHead>
+                                ))}
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
+                            </TableHeader>
+                            <TableBody>
+                              {entry.logs.updates.map((update, i) => (
+                                <TableRow key={i}>
+                                  <TableCell className="text-muted-foreground sticky left-0 bg-background">{i + 1}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">{update.matchedBy}</Badge>
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">{update.matchValue}</TableCell>
+                                  {TARGET_SCHEMA.map((col) => {
+                                    const val = update.fieldsToFill[col];
+                                    return (
+                                      <TableCell key={col} className={`text-xs whitespace-nowrap ${val ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
+                                        {val || '—'}
+                                      </TableCell>
+                                    );
+                                  })}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      </div>
                     </AccordionContent>
                   </AccordionItem>
                 )}
@@ -196,28 +208,36 @@ export default function SyncDetail() {
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <ScrollArea className="max-h-80">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-10">#</TableHead>
-                              <TableHead>Reason</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Phone</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {entry.logs.skipped.map((skip, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                                <TableCell>{skip.reason}</TableCell>
-                                <TableCell className="font-mono text-xs">{skip.sourceRow['Email'] || skip.sourceRow['email'] || '—'}</TableCell>
-                                <TableCell className="font-mono text-xs">{skip.sourceRow['Phoneno'] || skip.sourceRow['phone'] || '—'}</TableCell>
+                      <div className="overflow-x-auto">
+                        <ScrollArea className="max-h-96">
+                          <Table className="min-w-[1000px]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-10 sticky left-0 bg-background">#</TableHead>
+                                <TableHead>Reason</TableHead>
+                                <TableHead>Details</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
+                            </TableHeader>
+                            <TableBody>
+                              {entry.logs.skipped.map((skip, i) => (
+                                <TableRow key={i}>
+                                  <TableCell className="text-muted-foreground sticky left-0 bg-background">{i + 1}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{skip.reason}</TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                      {Object.entries(skip.sourceRow).map(([k, v]) => (
+                                        <span key={k} className="text-xs">
+                                          <span className="text-muted-foreground">{k}:</span> {v || '—'}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      </div>
                     </AccordionContent>
                   </AccordionItem>
                 )}

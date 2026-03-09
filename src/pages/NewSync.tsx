@@ -58,12 +58,19 @@ export default function NewSync() {
   }, [primarySheet, primaryTab, accessToken]);
 
   // Run comparison
+  const [isComparing, setIsComparing] = useState(false);
+
   const handleRunComparison = (mappingsOverride?: ColumnMapping[]) => {
     const effectiveMappings = mappingsOverride || columnMappings;
     if (!sourceRows.length || !effectiveMappings.length) return;
-    const result = runComparison(primaryRows, sourceRows, effectiveMappings);
-    setComparisonResult(result);
-    next();
+    setIsComparing(true);
+    // Use setTimeout to let the loading UI render before blocking computation
+    setTimeout(() => {
+      const result = runComparison(primaryRows, sourceRows, effectiveMappings);
+      setComparisonResult(result);
+      setIsComparing(false);
+      next();
+    }, 50);
   };
 
   // Execute sync

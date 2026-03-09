@@ -173,6 +173,7 @@ export default function NewSync() {
       key={4}
       sourceHeaders={sourceHeaders}
       isComparing={isComparing}
+      comparisonProgress={comparisonProgress}
       onMappingsSet={(m) => { setColumnMappings(m); handleRunComparison(m); }}
       onBack={back}
       mappings={columnMappings}

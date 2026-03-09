@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,22 +13,46 @@ interface Props {
   onBack: () => void;
 }
 
+/** Normalize a column name for comparison */
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[\s_\-()]/g, '');
+}
+
+/** Count how many target columns were auto-matched */
+function computeAutoMapStats(sourceHeaders: string[]) {
+  const sourceNormed = new Set(sourceHeaders.map(norm));
+  let matched = 0;
+  const unmatched: string[] = [];
+  for (const col of TARGET_SCHEMA) {
+    if (sourceNormed.has(norm(col))) {
+      matched++;
+    } else {
+      unmatched.push(col);
+    }
+  }
+  // Source headers that didn't match any target column
+  const targetNormed = new Set(TARGET_SCHEMA.map(norm));
+  const unmappedSource = sourceHeaders.filter((h) => !targetNormed.has(norm(h)));
+
+  return { matched, unmatched, unmappedSource, total: TARGET_SCHEMA.length };
+}
+
 export default function StepColumnMapping({ sourceHeaders, mappings: existingMappings, onMappingsSet, onBack }: Props) {
   const [mappings, setMappings] = useState<Record<string, string>>(() => {
-    // Auto-map by name similarity
     const initial: Record<string, string> = {};
     for (const targetCol of TARGET_SCHEMA) {
-      const match = sourceHeaders.find(
-        (h) => h.toLowerCase().replace(/[\s_-]/g, '') === targetCol.toLowerCase().replace(/[\s_-]/g, '')
-      );
+      const match = sourceHeaders.find((h) => norm(h) === norm(targetCol));
       if (match) initial[targetCol] = match;
     }
-    // Restore existing mappings
     for (const m of existingMappings) {
       initial[m.targetColumn] = m.sourceColumn;
     }
     return initial;
   });
+
+  const autoStats = useMemo(() => computeAutoMapStats(sourceHeaders), [sourceHeaders]);
+
+  const mappedCount = Object.values(mappings).filter((v) => v && v !== '_unmapped_').length;
 
   const setMapping = (targetCol: string, sourceCol: string) => {
     setMappings((prev) => ({ ...prev, [targetCol]: sourceCol }));
@@ -42,7 +66,7 @@ export default function StepColumnMapping({ sourceHeaders, mappings: existingMap
       }
     }
     if (!result.some((m) => m.targetColumn === 'Email') && !result.some((m) => m.targetColumn === 'Phoneno')) {
-      return; // At least one match key required
+      return;
     }
     onMappingsSet(result);
   };
@@ -50,6 +74,8 @@ export default function StepColumnMapping({ sourceHeaders, mappings: existingMap
   const hasMatchKey = Object.entries(mappings).some(
     ([k, v]) => (k === 'Email' || k === 'Phoneno') && v && v !== '_unmapped_'
   );
+
+  const lowMatchRate = autoStats.matched < Math.ceil(autoStats.total * 0.3);
 
   return (
     <Card className="border-border">
@@ -64,9 +90,38 @@ export default function StepColumnMapping({ sourceHeaders, mappings: existingMap
           </div>
         </div>
 
+        {/* Auto-map feedback banner */}
+        {lowMatchRate ? (
+          <div className="flex items-start gap-3 bg-warning/10 border border-warning/20 rounded-lg p-3">
+            <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-foreground">
+                Low auto-match: only {autoStats.matched} of {autoStats.total} columns matched
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Your source headers don't closely match the target schema. Please map columns manually below.
+              </p>
+              {autoStats.unmappedSource.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Unrecognized source columns: {autoStats.unmappedSource.slice(0, 6).join(', ')}
+                  {autoStats.unmappedSource.length > 6 && ` (+${autoStats.unmappedSource.length - 6} more)`}
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-success/10 border border-success/20 rounded-lg px-3 py-2">
+            <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+            <p className="text-sm text-foreground">
+              Auto-mapped {autoStats.matched} of {autoStats.total} columns. {mappedCount} total mapped.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2 max-h-[450px] overflow-y-auto">
           {TARGET_SCHEMA.map((targetCol) => {
             const isKey = targetCol === 'Email' || targetCol === 'Phoneno';
+            const isMapped = mappings[targetCol] && mappings[targetCol] !== '_unmapped_';
             return (
               <div key={targetCol} className="flex items-center gap-3 py-2">
                 <div className="w-1/2">
@@ -80,7 +135,7 @@ export default function StepColumnMapping({ sourceHeaders, mappings: existingMap
                     value={mappings[targetCol] || '_unmapped_'}
                     onValueChange={(v) => setMapping(targetCol, v)}
                   >
-                    <SelectTrigger className="h-9 text-sm">
+                    <SelectTrigger className={`h-9 text-sm ${!isMapped && isKey ? 'border-destructive/50' : ''}`}>
                       <SelectValue placeholder="Select source column" />
                     </SelectTrigger>
                     <SelectContent>

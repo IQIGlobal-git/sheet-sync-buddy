@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import DryRunPreview from './DryRunPreview';
 import type { ComparisonResult, DestinationConfig } from '@/types/sync';
 import type { GoogleSpreadsheet } from '@/types/google';
 
@@ -21,6 +22,8 @@ interface Props {
   sourceLabel: string;
   destination: DestinationConfig;
   result: ComparisonResult | null;
+  primaryHeaders: string[];
+  primaryRowCount: number;
   isLoading: boolean;
   onConfirm: () => void;
   onBack: () => void;

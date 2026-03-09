@@ -58,9 +58,10 @@ export default function NewSync() {
   }, [primarySheet, primaryTab, accessToken]);
 
   // Run comparison
-  const handleRunComparison = () => {
-    if (!sourceRows.length || !columnMappings.length) return;
-    const result = runComparison(primaryRows, sourceRows, columnMappings);
+  const handleRunComparison = (mappingsOverride?: ColumnMapping[]) => {
+    const effectiveMappings = mappingsOverride || columnMappings;
+    if (!sourceRows.length || !effectiveMappings.length) return;
+    const result = runComparison(primaryRows, sourceRows, effectiveMappings);
     setComparisonResult(result);
     next();
   };
@@ -157,7 +158,7 @@ export default function NewSync() {
     <StepColumnMapping
       key={4}
       sourceHeaders={sourceHeaders}
-      onMappingsSet={(m) => { setColumnMappings(m); handleRunComparison(); }}
+      onMappingsSet={(m) => { setColumnMappings(m); handleRunComparison(m); }}
       onBack={back}
       mappings={columnMappings}
     />,

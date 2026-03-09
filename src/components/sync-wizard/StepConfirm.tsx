@@ -79,6 +79,14 @@ export default function StepConfirm({
           </div>
         </div>
 
+        {/* Dry-run cell preview */}
+        <DryRunPreview
+          result={result}
+          destination={destination}
+          primaryHeaders={primaryHeaders}
+          primaryRowCount={primaryRowCount}
+        />
+
         <div className="flex items-start gap-3 bg-warning/10 border border-warning/20 rounded-lg p-3">
           <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
           <p className="text-sm text-foreground">

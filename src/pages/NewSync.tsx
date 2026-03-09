@@ -158,7 +158,7 @@ export default function NewSync() {
     <StepColumnMapping
       key={4}
       sourceHeaders={sourceHeaders}
-      onMappingsSet={(m) => { setColumnMappings(m); handleRunComparison(); }}
+      onMappingsSet={(m) => { setColumnMappings(m); handleRunComparison(m); }}
       onBack={back}
       mappings={columnMappings}
     />,

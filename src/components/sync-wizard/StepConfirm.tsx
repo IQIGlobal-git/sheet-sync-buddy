@@ -30,7 +30,7 @@ interface Props {
 }
 
 export default function StepConfirm({
-  primarySheet, primaryTab, sourceLabel, destination, result, isLoading, onConfirm, onBack,
+  primarySheet, primaryTab, sourceLabel, destination, result, primaryHeaders, primaryRowCount, isLoading, onConfirm, onBack,
 }: Props) {
   if (!result) return null;
 

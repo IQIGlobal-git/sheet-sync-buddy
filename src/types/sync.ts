@@ -37,6 +37,14 @@ export interface ColumnMapping {
   targetColumn: TargetColumn;
 }
 
+/** A saved column mapping preset */
+export interface MappingPreset {
+  id: string;
+  name: string;
+  mappings: ColumnMapping[];
+  createdAt: string;
+}
+
 /** Status of a sync run */
 export type SyncRunStatus = 'pending' | 'running' | 'completed' | 'failed';
 

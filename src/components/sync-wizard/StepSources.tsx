@@ -12,22 +12,27 @@ import {
   Table2,
   CheckCircle2,
   AlertTriangle,
+  Save,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useGoogleAuth } from '@/features/auth/GoogleAuthContext';
 import { listSpreadsheets, listTabs, readRows } from '@/services/googleSheets';
 import { parseCSVFile } from '@/services/csvParser';
+import { getMappingPresets, saveMappingPreset, deleteMappingPreset } from '@/services/mappingPresets';
 import { MAX_CSV_SIZE } from '@/lib/constants';
 import { TARGET_SCHEMA } from '@/types/sync';
-import type { SourceEntry, SourceType, ColumnMapping, SheetRow } from '@/types/sync';
+import type { SourceEntry, SourceType, ColumnMapping, SheetRow, MappingPreset } from '@/types/sync';
 import type { ComparisonProgress } from '@/features/sync/comparisonEngine';
 import type { GoogleSpreadsheet, GoogleSheetTab } from '@/types/google';
+import ColumnCombobox from './ColumnCombobox';
 
 type Phase = 'list' | 'select-type' | 'load-csv' | 'load-sheet' | 'map-columns';
 
@@ -528,6 +533,11 @@ function ColumnMapper({
     return initial;
   });
 
+  const [presets, setPresets] = useState<MappingPreset[]>(() => getMappingPresets());
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [loadPresetOpen, setLoadPresetOpen] = useState(false);
+
   const autoStats = useMemo(() => {
     const sourceNormed = new Set(sourceHeaders.map(norm));
     let matched = 0;
@@ -543,17 +553,68 @@ function ColumnMapper({
     setMappings((prev) => ({ ...prev, [targetCol]: sourceCol }));
   };
 
-  const handleSave = () => {
+  const currentMappingsAsArray = (): ColumnMapping[] => {
     const result: ColumnMapping[] = [];
     for (const [target, source] of Object.entries(mappings)) {
       if (source && source !== '_unmapped_') {
         result.push({ sourceColumn: source, targetColumn: target as any });
       }
     }
+    return result;
+  };
+
+  const handleSave = () => {
+    const result = currentMappingsAsArray();
     if (!result.some((m) => m.targetColumn === 'Email') && !result.some((m) => m.targetColumn === 'Phoneno')) {
       return;
     }
     onSave(result);
+  };
+
+  const handleSavePreset = () => {
+    const name = presetName.trim();
+    if (!name) return;
+    const arr = currentMappingsAsArray();
+    if (arr.length === 0) {
+      toast.error('Map at least one column before saving a preset.');
+      return;
+    }
+    saveMappingPreset(name, arr);
+    setPresets(getMappingPresets());
+    setSaveDialogOpen(false);
+    setPresetName('');
+    toast.success(`Preset "${name}" saved.`);
+  };
+
+  const applyPreset = (preset: MappingPreset) => {
+    const headerSet = new Set(sourceHeaders);
+    const newMappings: Record<string, string> = {};
+    for (const col of TARGET_SCHEMA) {
+      newMappings[col] = '_unmapped_';
+    }
+    let applied = 0;
+    let skipped = 0;
+    for (const m of preset.mappings) {
+      if (headerSet.has(m.sourceColumn)) {
+        newMappings[m.targetColumn] = m.sourceColumn;
+        applied++;
+      } else {
+        skipped++;
+      }
+    }
+    setMappings(newMappings);
+    setLoadPresetOpen(false);
+    if (skipped > 0) {
+      toast.info(`Applied ${applied} mappings, skipped ${skipped} (columns not found in source).`);
+    } else {
+      toast.success(`Applied ${applied} mappings from "${preset.name}".`);
+    }
+  };
+
+  const handleDeletePreset = (id: string) => {
+    deleteMappingPreset(id);
+    setPresets(getMappingPresets());
+    toast.success('Preset deleted.');
   };
 
   const hasMatchKey = Object.entries(mappings).some(
@@ -582,6 +643,51 @@ function ColumnMapper({
           </p>
         </div>
 
+        {/* Preset toolbar */}
+        <div className="flex items-center gap-2">
+          <Popover open={loadPresetOpen} onOpenChange={setLoadPresetOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                Load Preset <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="start">
+              {presets.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No saved presets</p>
+              ) : (
+                <div className="space-y-1">
+                  {presets.map((preset) => (
+                    <div
+                      key={preset.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent"
+                    >
+                      <button
+                        onClick={() => applyPreset(preset)}
+                        className="flex-1 text-left text-sm truncate"
+                      >
+                        {preset.name}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePreset(preset.id);
+                        }}
+                        className="shrink-0 p-1 rounded hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSaveDialogOpen(true)}>
+            <Save className="h-3.5 w-3.5" /> Save as Preset
+          </Button>
+        </div>
+
         <div className="space-y-2 max-h-[450px] overflow-y-auto">
           {TARGET_SCHEMA.map((targetCol) => {
             const isKey = targetCol === 'Email' || targetCol === 'Phoneno';
@@ -595,20 +701,13 @@ function ColumnMapper({
                   </span>
                 </div>
                 <div className="w-1/2">
-                  <Select
+                  <ColumnCombobox
                     value={mappings[targetCol] || '_unmapped_'}
-                    onValueChange={(v) => setMapping(targetCol, v)}
-                  >
-                    <SelectTrigger className={`h-9 text-sm ${!isMapped && isKey ? 'border-destructive/50' : ''}`}>
-                      <SelectValue placeholder="Select source column" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_unmapped_">— Not mapped —</SelectItem>
-                      {sourceHeaders.map((h) => (
-                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={sourceHeaders}
+                    onSelect={(v) => setMapping(targetCol, v)}
+                    placeholder="Select source column"
+                    triggerClassName={!isMapped && isKey ? 'border-destructive/50' : ''}
+                  />
                 </div>
               </div>
             );
@@ -624,6 +723,30 @@ function ColumnMapper({
             Save Mapping <CheckCircle2 className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Save Preset Dialog */}
+        <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Save Mapping Preset</DialogTitle>
+              <DialogDescription>
+                Give this mapping configuration a name for later reuse.
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder="e.g. Facebook Leads CSV"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSavePreset();
+              }}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleSavePreset} disabled={!presetName.trim()}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
